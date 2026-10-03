@@ -6,8 +6,9 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { rebuildToken, inspectContract, lintScript, renderCheck, preflight, lessons } from './tools.mjs';
+import { listLibraries } from './deps.mjs';
 
-const server = new McpServer({ name: 'abx-artist-kit', version: '0.1.0' });
+const server = new McpServer({ name: 'abx-artist-kit', version: '0.2.0' });
 
 const chain = z.enum(['base', 'base-sepolia']).default('base').describe('base (mainnet, 8453) or base-sepolia (84532)');
 const address = z.string().regex(/^0x[0-9a-fA-F]{40}$/).describe('ABX contract address');
@@ -23,7 +24,7 @@ const wrap = (fn) => async (args) => {
 
 server.registerTool('rebuild_token', {
   title: 'Rebuild a token from the chain',
-  description: 'Rebuilds an ABX code token from the contract alone: reads the artist code (script chunks) and the token\'s mint seed with eth_call, wraps them like ABX\'s generator and writes a standalone HTML file. No ABX servers. Reports whether anything else (params, libraries, URLs) is needed.',
+  description: "Rebuilds an ABX code token from the contract alone: reads the artist code (script chunks), the token's mint seed and its libraries (on-chain data contracts, or Art Blocks' registry on Ethereum), wraps them like ABX's generator and writes a standalone HTML file. No ABX servers. Says which parts, if any, still come from a CDN.",
   inputSchema: { contract: address, tokenId: z.number().int().min(0), chain, rpc, outDir: z.string().optional().describe('folder for the HTML (default: current dir)') },
 }, wrap(rebuildToken));
 
@@ -48,14 +49,26 @@ server.registerTool('render_check', {
     size: z.number().int().min(200).max(2160).default(1000).describe('viewport px; ABX thumbnails are 1000'),
     timeoutSec: z.number().int().min(5).max(120).default(20),
     chromePath: z.string().optional(),
+    dependencies: z.array(z.string()).default([]).describe('libraries in --dep order, e.g. ["p5@1.9.0"] or a 0x data-contract address'),
+    chain: z.enum(['base', 'base-sepolia']).default('base').describe('chain for 0x data-contract dependencies'),
   },
 }, wrap(renderCheck));
 
 server.registerTool('preflight', {
   title: 'Preflight a deploy plan',
   description: 'Checks planned abx CLI commands (deploy, attach, set-admin, lock-script, ...) against known launch pitfalls before anything is signed: 721C on Base mainnet, collection image override, on-chain URI without traits, sponsor without handover, missing payee/max/minter, royalty, script lock.',
-  inputSchema: { commands: z.string().describe('the commands you plan to run, one per line'), chain: z.enum(['base', 'base-sepolia']).optional() },
+  inputSchema: {
+    commands: z.string().describe('the commands you plan to run, one per line'),
+    chain: z.enum(['base', 'base-sepolia']).optional(),
+    cliVersion: z.string().optional().describe('your abx-cli version (abx --version); some pitfalls are fixed in newer versions'),
+  },
 }, wrap(preflight));
+
+server.registerTool('list_libraries', {
+  title: 'On-chain libraries',
+  description: "Lists the libraries in Art Blocks' dependency registry on Ethereum (p5, three, tone, ...) and which ones are stored fully on-chain, with notes on what that means for an ABX project on Base.",
+  inputSchema: {},
+}, wrap(listLibraries));
 
 server.registerTool('lessons', {
   title: 'ABX launch lessons',

@@ -3,7 +3,13 @@
 export const CHAINS = {
   base: { id: 8453, rpcs: ['https://base-rpc.publicnode.com', 'https://base.drpc.org', 'https://mainnet.base.org'], explorer: 'https://basescan.org' },
   'base-sepolia': { id: 84532, rpcs: ['https://base-sepolia-rpc.publicnode.com', 'https://sepolia.base.org'], explorer: 'https://sepolia.basescan.org' },
+  // only used to read Art Blocks' on-chain library registry (p5, three, ...)
+  ethereum: { id: 1, rpcs: ['https://eth.drpc.org', 'https://ethereum-rpc.publicnode.com'], explorer: 'https://etherscan.io' },
 };
+
+// Art Blocks DependencyRegistryV0 .. ABX reads it for name@version libraries, but only lists it for
+// Ethereum (1) and Sepolia (11155111). Base has none (CLI 0.2.0 - 0.4.2).
+export const AB_DEPENDENCY_REGISTRY = { 1: '0x37861f95882ACDba2cCD84F5bFc4598e2ECDDdAF' };
 
 // selectors from the ABX SDK seriesCodeAbi (CLI 0.2.0)
 export const SEL = {
@@ -16,6 +22,9 @@ export const SEL = {
   tokenURIBase: '0x261220a3', tokenURILocked: '0xac998f45', tokenURIRenderer: '0xd50bac33',
   contractParamKeys: '0x55580cca', tokenParamKeys: '0xe1b79381', tokenParam: '0x6bd39222',
   tokenURI: '0xc87b56dd', minterSales: '0xc6b9f06a',
+  dependencyByIndex: '0xcfc59afd', dependencyRegistry: '0x20ac0944',
+  // on the registry contract
+  getDependencyDetails: '0x25ffb376', getDependencyScript: '0x518cb3df',
 };
 
 export const word = (n) => BigInt(n).toString(16).padStart(64, '0');
@@ -33,7 +42,7 @@ export function chainOf(name = 'base') {
   return c;
 }
 
-export async function ethCall(chain, to, data, rpc) {
+async function rpcRequest(chain, method, params, rpc) {
   const urls = rpc ? [rpc] : chainOf(chain).rpcs;
   let last;
   for (const url of urls) {
@@ -41,7 +50,7 @@ export async function ethCall(chain, to, data, rpc) {
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'user-agent': 'abx-artist-kit' },
-        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to, data }, 'latest'] }),
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
       });
       const j = await res.json();
       if (j.result !== undefined) return j.result;
@@ -52,8 +61,11 @@ export async function ethCall(chain, to, data, rpc) {
       last = e.message;
     }
   }
-  throw new Error(`eth_call failed on every RPC: ${last}`);
+  throw new Error(`${method} failed on every RPC: ${last}`);
 }
+
+export const ethCall = (chain, to, data, rpc) => rpcRequest(chain, 'eth_call', [{ to, data }, 'latest'], rpc);
+export const getCode = (chain, address, rpc) => rpcRequest(chain, 'eth_getCode', [address, 'latest'], rpc);
 
 // returns null instead of throwing when the function reverts or doesn't exist
 export async function tryCall(chain, to, data, rpc) {
@@ -91,4 +103,44 @@ export async function readSeed(chain, contract, tokenId, rpc) {
   const [value, isHash, isSet] = words(await ethCall(chain, contract, SEL.tokenParam + word(tokenId) + key32('seed'), rpc));
   if (!asBool(isSet)) return null;
   return { seed: '0x' + value, isHash: asBool(isHash) };
+}
+
+// string at a head slot of an ABI-encoded tuple
+function tupleString(hex, slot) {
+  const h = hex.replace(/^0x/, '');
+  const off = Number(BigInt('0x' + h.slice(slot * 64, slot * 64 + 64))) * 2;
+  const len = Number(BigInt('0x' + h.slice(off, off + 64)));
+  return Buffer.from(h.slice(off + 64, off + 64 + len * 2), 'hex').toString('utf8');
+}
+
+export async function readDependencies(chain, contract, rpc) {
+  const n = await tryCall(chain, contract, SEL.dependencyCount, rpc);
+  const count = n ? Number(asUint(words(n)[0])) : 0;
+  const list = [];
+  for (let i = 0; i < count; i++) {
+    const [res, ref] = words(await ethCall(chain, contract, SEL.dependencyByIndex + word(i), rpc));
+    const onchain = Number(asUint(res)) === 1;
+    list.push({ index: i, resolution: onchain ? 'onchain' : 'registry', ref: '0x' + ref,
+      name: onchain ? '0x' + ref.slice(0, 40) : Buffer.from(ref, 'hex').toString().replace(/\0+$/, '') });
+  }
+  const reg = count ? await tryCall(chain, contract, SEL.dependencyRegistry, rpc) : null;
+  return { list, registry: reg ? asAddr(words(reg)[0]) : null };
+}
+
+export async function registryDetails(chain, registry, nameAtVersion, rpc) {
+  const ref = Buffer.from(nameAtVersion).toString('hex').padEnd(64, '0');
+  const r = await tryCall(chain, registry, SEL.getDependencyDetails + ref, rpc);
+  if (!r) return null;
+  const w = words(r);
+  const d = { license: tupleString(r, 1), cdn: tupleString(r, 2), repo: tupleString(r, 4), website: tupleString(r, 6),
+    availableOnChain: asBool(w[7]), scriptCount: Number(asUint(w[8])) };
+  const exists = d.license || d.cdn || d.repo || d.website || d.availableOnChain || d.scriptCount > 0;
+  return exists ? d : null;
+}
+
+export async function registryScript(chain, registry, nameAtVersion, count, rpc) {
+  const ref = Buffer.from(nameAtVersion).toString('hex').padEnd(64, '0');
+  const parts = [];
+  for (let i = 0; i < count; i++) parts.push(decodeString(await ethCall(chain, registry, SEL.getDependencyScript + ref + word(i), rpc)));
+  return parts.join(''); // base64 of gzip, like ABX expects
 }

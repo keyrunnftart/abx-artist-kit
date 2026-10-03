@@ -1,0 +1,45 @@
+name: abx watch
+
+# weekly: does the latest ABX release still match what the kit assumes?
+# opens (or comments on) one issue when something changed. nothing is auto-edited.
+on:
+  schedule:
+    - cron: '30 3 * * 1'   # mondays 03:30 UTC (09:00 IST)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: install
+        working-directory: mcp
+        run: npm ci --omit=optional --no-audit --no-fund
+      - name: check latest abx
+        id: watch
+        working-directory: mcp
+        run: node scripts/abx-watch.mjs
+      - name: report
+        working-directory: mcp
+        run: cat report.md >> "$GITHUB_STEP_SUMMARY"
+      - name: open or update issue
+        if: steps.watch.outputs.changed == 'true'
+        working-directory: mcp
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CLI: ${{ steps.watch.outputs.cli }}
+        run: |
+          title="abx watch: changes in abx-cli $CLI"
+          n=$(gh issue list --state open --search "in:title \"$title\"" --json number --jq '.[0].number')
+          if [ -n "$n" ]; then
+            gh issue comment "$n" --body-file report.md
+          else
+            gh issue create --title "$title" --body-file report.md
+          fi

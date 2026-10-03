@@ -19,7 +19,7 @@ export function tokenDataJson({ chainId, contract, tokenId, seed }) {
   return JSON.stringify(sorted);
 }
 
-export function buildDocument(script, tokenData, { title = 'abx token', probe = false } = {}) {
+export function buildDocument(script, tokenData, { title = 'abx token', probe = false, depTags = [] } = {}) {
   return [
     '<!doctype html>',
     '<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">',
@@ -28,6 +28,7 @@ export function buildDocument(script, tokenData, { title = 'abx token', probe = 
     probe ? `<script>${PROBE_JS}</script>` : '',
     `<script>window.abxTokenData=${tokenData.replace(/</g, '\\u003c')};</script>`,
     `<script>${ABX_JS}</script>`,
+    ...depTags,
     '</head><body>',
     `<script>\n${script.replace(/<\/(script)/gi, '<\\/$1')}\n</script>`,
     '</body></html>',

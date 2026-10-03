@@ -1,5 +1,5 @@
 {
-  "testedCli": "0.2.0",
+  "testedCli": "0.4.2",
   "lessons": [
     {
       "id": "collection-image-override",
@@ -7,7 +7,9 @@
       "seenIn": "0.2.0",
       "problem": "Attaching a collection-scope `image` field also becomes the default image of EVERY token, and it beats the render effect. Every thumbnail turns into your logo. It can't be cleared afterwards: the field store rejects empty values.",
       "fix": "Never set collection `image`. Put the logo in `featured_image` and the banner in `banner_image` (collection-only keys).",
-      "detect": "preflight flags `attach <addr> image ... --collection`"
+      "detect": "preflight flags `attach <addr> image ... --collection`",
+      "changedIn": "0.4.2",
+      "changeNote": "0.4.2 warns before a collection image masks every token render. The field still can't be cleared once set."
     },
     {
       "id": "721c-base-mainnet",
@@ -15,7 +17,9 @@
       "seenIn": "0.2.0",
       "problem": "`--721c recommended` only resolves on testnets; the CLI has no recommended validator for Base mainnet.",
       "fix": "Pass OpenSea's StrictAuthorizedTransferSecurityRegistry explicitly: --721c 0xA000027A9B2802E1ddf7000061001e5c005A0000 (same bytecode on Base mainnet). Once enrolled, only OpenSea-authorized secondary sales pass; the owner can suspend with `abx set-transfer-validator <addr> none`.",
-      "detect": "preflight checks --721c on chain base"
+      "detect": "preflight checks --721c on chain base",
+      "fixedIn": "0.4.2",
+      "fixNote": "0.4.2 added Base mainnet's recommended 721C validator (the same OpenSea registry), so `--721c recommended` works from 0.4.2."
     },
     {
       "id": "renderer-square-1000",
@@ -63,7 +67,9 @@
       "seenIn": "0.2.0",
       "problem": "mainnet.base.org rate-limits (HTTP 429) during normal mint-page polling and CLI reads.",
       "fix": "Set ABX_RPC_URLS_BASE to a list, e.g. https://base-rpc.publicnode.com,https://base.drpc.org,https://mainnet.base.org, and use the same order on your mint page.",
-      "detect": "manual"
+      "detect": "manual",
+      "fixedIn": "0.4.2",
+      "fixNote": "the CLI fails over across public RPCs by default from 0.4.2. Your own mint page still needs its own fallback list."
     },
     {
       "id": "wallet-hijack",
@@ -104,6 +110,27 @@
       "problem": "An unlocked script can be replaced by the owner at any time, which changes every token.",
       "fix": "Test on testnet, then `abx lock-script <addr>` before the public sale.",
       "detect": "inspect_contract"
+    },
+    {
+      "id": "base-no-dependency-registry",
+      "topic": "script",
+      "seenIn": "0.2.0",
+      "problem": "ABX only knows Art Blocks' dependency registry on Ethereum and Sepolia. On Base a `--dep p5@1.9.0` reference has no registry, so ABX's resolver loads the library from a CDN (jsdelivr): the live view depends on that CDN, not on chain data.",
+      "fix": "Zero-dependency vanilla JS is the fully on-chain path. If you need a library, pick a version stored on-chain in Art Blocks' registry (list_libraries) so the piece can still be rebuilt from chain data (rebuild_token pulls it from Ethereum), or deploy the library as a data contract on Base and add it with `--dep 0x…`.",
+      "detect": "lint_script, rebuild_token, list_libraries"
     }
-  ]
+  ],
+  "watch": {
+    "abxJsSha": "8e236953d512561fdf7fc3a91df98089fb3cfbdf53577516bf88e01d301474c4",
+    "generatorShapeSha": "c7c79d69ebb287f4707d453f4bb4e89272d9d3706e6af2137110b88826cd39b8",
+    "chunkSize": 22000,
+    "validator8453": "0xA000027A9B2802E1ddf7000061001e5c005A0000",
+    "depRegistry8453": null,
+    "liveToken": {
+      "contract": "0xB13971551bd3C14A0F793571347dDCdfB08902ba",
+      "chain": "base",
+      "tokenId": 2,
+      "codeSha256": "4c90b322e0afb34df4c2b4233125e5144d5e62dc0fb22a18b34caa5a72060209"
+    }
+  }
 }

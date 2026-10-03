@@ -8,8 +8,9 @@ import { pathToFileURL } from 'node:url';
 import { execFile } from 'node:child_process';
 import {
   SEL, ZERO, chainOf, tryCall, word, addrWord, words, asAddr, asUint, asBool,
-  decodeString, decodeKeys, readScript, readSeed,
+  decodeString, decodeKeys, readScript, readSeed, readDependencies,
 } from './chain.mjs';
+import { resolveDependency } from './deps.mjs';
 import { buildDocument, tokenDataJson } from './html.mjs';
 
 const LESSONS = JSON.parse(readFileSync(new URL('./lessons.json', import.meta.url), 'utf8'));
@@ -25,14 +26,16 @@ export async function rebuildToken({ contract, tokenId, chain = 'base', rpc, out
   if (!count) throw new Error('no script chunks on this contract .. not an ABX code project?');
   const seed = await readSeed(chain, contract, tokenId, rpc);
   if (!seed) throw new Error(`token #${tokenId} has no seed .. not minted yet?`);
-  const [tokenKeys, contractKeys, deps, locked] = await Promise.all([
+  const [tokenKeys, contractKeys, depInfo, locked] = await Promise.all([
     tryCall(chain, contract, SEL.tokenParamKeys + word(tokenId), rpc).then((h) => (h ? decodeKeys(h) : [])),
     tryCall(chain, contract, SEL.contractParamKeys, rpc).then((h) => (h ? decodeKeys(h) : [])),
-    tryCall(chain, contract, SEL.dependencyCount, rpc).then((h) => (h ? Number(asUint(words(h)[0])) : 0)),
+    readDependencies(chain, contract, rpc),
     tryCall(chain, contract, SEL.scriptLocked, rpc).then((h) => (h ? asBool(words(h)[0]) : null)),
   ]);
   const extra = [...tokenKeys.filter((k) => k !== 'seed'), ...contractKeys];
-  const html = buildDocument(script, tokenDataJson({ chainId: c.id, contract, tokenId, seed: seed.seed }), { title: `#${tokenId}` });
+  const libs = [];
+  for (const d of depInfo.list) libs.push(await resolveDependency(d, { chain, registry: depInfo.registry, rpc }));
+  const html = buildDocument(script, tokenDataJson({ chainId: c.id, contract, tokenId, seed: seed.seed }), { title: `#${tokenId}`, depTags: libs.map((l) => l.tag) });
   const dir = resolve(outDir ?? process.cwd());
   mkdirSync(dir, { recursive: true });
   const file = join(dir, `${contract.slice(0, 8).toLowerCase()}_${tokenId}.html`);
@@ -41,7 +44,9 @@ export async function rebuildToken({ contract, tokenId, chain = 'base', rpc, out
   const warn = [];
   if (seed.isHash) warn.push('the seed is stored as a hash, not a literal .. this rebuild passes the hash');
   if (extra.length) warn.push(`the program may also read: ${extra.join(', ')} .. not passed in this rebuild, so it may differ`);
-  if (deps) warn.push(`${deps} on-chain dependenc${deps === 1 ? 'y' : 'ies'} (libraries) declared .. not inlined by this rebuild yet`);
+  for (const l of libs) if (!l.onchain) warn.push(`library ${l.name}: ${l.note} (${l.source})`);
+  if (libs.some((l) => l.onchain && /Ethereum/.test(l.source)) && chain !== 'ethereum')
+    warn.push(`library bytes come from Art Blocks' registry on Ethereum; ABX's own live view on ${chain} loads them from a CDN ${cite('base-no-dependency-registry')}`);
   if (urls.length) warn.push(`the code references ${urls.length} external URL(s): ${[...new Set(urls)].slice(0, 5).join(' ')}`);
   return {
     file,
@@ -50,8 +55,9 @@ export async function rebuildToken({ contract, tokenId, chain = 'base', rpc, out
     codeSha256: sha256(script),
     seed: seed.seed,
     inputs: extra.length ? ['seed', ...extra] : ['seed'],
-    dependencies: deps, externalUrls: urls.length,
-    fullyFromChain: !extra.length && !deps && !urls.length && !seed.isHash,
+    libraries: libs.map(({ name, onchain, source, bytes }) => ({ name, onchain, source, bytes })),
+    externalUrls: urls.length,
+    fullyFromChain: !extra.length && libs.every((l) => l.onchain) && !urls.length && !seed.isHash,
     warnings: warn,
   };
 }
@@ -163,7 +169,12 @@ export function lintScript({ path, source }) {
   if (store.length) add('warn', `browser storage${at(store)} .. renders could differ between viewers`);
   const libs = [['p5', /\bcreateCanvas\s*\(|\bp5\./], ['three.js', /\bTHREE\./], ['tone.js', /\bTone\./], ['regl', /\bcreateREGL\b|\bregl\(/]]
     .filter(([, re]) => re.test(src)).map(([n]) => n);
-  if (libs.length) add('info', `looks like it uses ${libs.join(', ')} .. declare it as an on-chain dependency, don't load it from a CDN`);
+  if (libs.length) add('info', `looks like it uses ${libs.join(', ')} .. declare it with --dep, don't load it from a CDN. only some versions are stored on-chain (p5@1.0.0 and three@0.124.0 are; p5@1.9.0 is CDN-only) .. see list_libraries, test with render_check dependencies`, 'base-no-dependency-registry');
+  if (libs.includes('p5')) {
+    const usesRandom = /\brandom\s*\(|\brandomGaussian\s*\(|\bshuffle\s*\(/.test(src.replace(/Math\.random/g, ''));
+    if (usesRandom && !/\brandomSeed\s*\(/.test(src)) add('error', 'p5 random()/shuffle() used without randomSeed(...) from the mint seed .. every load differs', 'math-random');
+    if (/\bnoise\s*\(/.test(src) && !/\bnoiseSeed\s*\(/.test(src)) add('error', 'p5 noise() used without noiseSeed(...) from the mint seed .. every load differs', 'math-random');
+  }
 
   const errors = findings.filter((f) => f.level === 'error').length;
   return { path: path ?? null, bytes, chunks, sha256: sha256(src), ok: errors === 0, errors, findings };
@@ -180,14 +191,17 @@ async function launchBrowser(chromePath) {
   return chromium.launch(opts);
 }
 
-export async function renderCheck({ path, seeds = 10, size = 1000, timeoutSec = 20, chromePath }) {
+export async function renderCheck({ path, seeds = 10, size = 1000, timeoutSec = 20, chromePath, dependencies = [], chain = 'base' }) {
   const src = readFileSync(path, 'utf8');
+  const libs = [];
+  for (const d of dependencies) libs.push(await resolveDependency(d, { chain }));
+  const depTags = libs.map((l) => l.tag);
   const dir = mkdtempSync(join(tmpdir(), 'abx-render-'));
   const browser = await launchBrowser(chromePath);
   const runs = [];
   const renderOne = async (seed, n) => {
     const file = join(dir, `s${n}.html`);
-    writeFileSync(file, buildDocument(src, tokenDataJson({ chainId: 84532, contract: ZERO, tokenId: n, seed }), { probe: true }));
+    writeFileSync(file, buildDocument(src, tokenDataJson({ chainId: 84532, contract: ZERO, tokenId: n, seed }), { probe: true, depTags }));
     const page = await browser.newPage({ viewport: { width: size, height: size } });
     const errs = [];
     page.on('pageerror', (e) => errs.push(e.message));
@@ -224,7 +238,9 @@ export async function renderCheck({ path, seeds = 10, size = 1000, timeoutSec = 
     if (slow.ms > 8000) findings.push({ level: 'error', msg: `slowest seed took ${(slow.ms / 1000).toFixed(1)}s .. the hosted renderer gives up near 10s ${cite('renderer-10s-timeout')}` });
     else if (slow.ms > 5000) findings.push({ level: 'warn', msg: `slowest seed took ${(slow.ms / 1000).toFixed(1)}s on this machine .. ABX's renderer may be slower, aim under 5s ${cite('renderer-10s-timeout')}` });
     if (!deterministic) findings.push({ level: 'error', msg: `the same seed rendered twice gave a different ${again.shot !== runs[0].shot ? 'image' : 'trait set'} ${cite('math-random')}` });
-    if (probes.random) findings.push({ level: 'error', msg: `Math.random called ${probes.random} times during renders ${cite('math-random')}` });
+    if (probes.random) findings.push(deterministic
+      ? { level: 'warn', msg: `Math.random called ${probes.random} times over ${runs.length} renders, but the same seed gave the same image .. likely library internals, check your own code ${cite('math-random')}` }
+      : { level: 'error', msg: `Math.random called ${probes.random} times during renders ${cite('math-random')}` });
     if (probes.fetch) findings.push({ level: 'warn', msg: `fetch called ${probes.fetch} times .. depends on the network` });
     const errs = [...new Set(runs.flatMap((r) => r.errors))];
     if (errs.length) findings.push({ level: 'error', msg: `page errors: ${errs.slice(0, 3).join(' | ')}` });
@@ -234,6 +250,9 @@ export async function renderCheck({ path, seeds = 10, size = 1000, timeoutSec = 
     for (const [k, vals] of Object.entries(traitDist)) {
       if (Object.keys(vals).length === 1 && runs.length >= 5) findings.push({ level: 'info', msg: `trait "${k}" was the same on every seed (${Object.keys(vals)[0]})` });
     }
+    for (const l of libs) findings.push(l.onchain
+      ? { level: 'info', msg: `library ${l.name} loaded from ${l.source}` }
+      : { level: 'warn', msg: `library ${l.name} loaded from ${l.source} .. not on-chain` });
     return {
       path, seeds: runs.length, size,
       timeMs: { min: times[0], median: times[Math.floor(times.length / 2)], max: times.at(-1), slowestSeed: slow.seed },
@@ -250,7 +269,7 @@ export async function renderCheck({ path, seeds = 10, size = 1000, timeoutSec = 
 }
 
 // ---------- preflight ----------
-export function preflight({ commands, chain }) {
+export function preflight({ commands, chain, cliVersion }) {
   const text = commands.replace(/\\\r?\n/g, ' ').replace(/`\r?\n/g, ' ');
   const lines = text.split(/\r?\n|&&|;/).map((l) => l.trim()).filter(Boolean);
   const findings = [];
@@ -265,7 +284,12 @@ export function preflight({ commands, chain }) {
       deploy = true;
       if (!ch) add('warn', 'no ABX_CHAIN on the deploy line .. say which chain explicitly');
       const v = flag(l, '721c');
-      if (ch === 'base' && v === 'recommended') add('error', '--721c recommended does not resolve on base mainnet in CLI 0.2.0 .. pass 0xA000027A9B2802E1ddf7000061001e5c005A0000', '721c-base-mainnet');
+      if (ch === 'base' && v === 'recommended') {
+        if (!cliVersion) add('warn', '--721c recommended on base mainnet needs CLI 0.4.2+ .. on older CLIs pass 0xA000027A9B2802E1ddf7000061001e5c005A0000 (pass cliVersion to check)', '721c-base-mainnet');
+        else if (cmpVer(cliVersion, '0.4.2') < 0) add('error', `--721c recommended does not resolve on base mainnet in CLI ${cliVersion} .. pass 0xA000027A9B2802E1ddf7000061001e5c005A0000 or upgrade to 0.4.2+`, '721c-base-mainnet');
+      }
+      const deps = [...l.matchAll(/--dep[ =]+(\S+)/g)].flatMap((m) => m[1].split(','));
+      if (ch === 'base' && deps.some((x) => /@/.test(x))) add('warn', `name@version deps on base (${deps.filter((x) => /@/.test(x)).join(', ')}) .. ABX's live view will load them from a CDN`, 'base-no-dependency-registry');
       if (v === undefined) add('info', 'no --721c .. royalties will be optional on every marketplace (fine if intended)');
       const bps = flag(l, 'royalty-bps');
       if (bps === undefined) add('info', 'no --royalty-bps .. the default is 5%');
@@ -290,7 +314,7 @@ export function preflight({ commands, chain }) {
   if (sponsored && !setAdmin) add('warn', '--sponsor without set-admin .. ABX\'s creator wallet stays owner/creator', 'sponsored-deployer');
   if (deploy && !lockScript) add('info', 'no lock-script in this plan .. lock before the public sale', 'lock-script');
   if (!lines.length) add('warn', 'no commands found');
-  return { ok: !findings.some((f) => f.level === 'error'), commands: lines.length, findings, testedCli: LESSONS.testedCli };
+  return { ok: !findings.some((f) => f.level === 'error'), commands: lines.length, findings, testedCli: LESSONS.testedCli, cliVersion: cliVersion ?? null };
 }
 
 // ---------- lessons ----------
@@ -316,9 +340,14 @@ export async function lessons({ topic, projectDir }) {
   return {
     testedCli: LESSONS.testedCli,
     yourCli: cli ?? 'not found (pass projectDir where @artblocks/abx-cli is installed)',
-    staleWarning: newer ? `your CLI ${cli} is newer than ${LESSONS.testedCli} .. some lessons may already be fixed, recheck before relying on them` : null,
+    staleWarning: newer ? `your CLI ${cli} is newer than ${LESSONS.testedCli} (last checked) .. some lessons may already be fixed, recheck before relying on them` : null,
     topics: [...new Set(LESSONS.lessons.map((l) => l.topic))],
-    lessons: list.map(({ id, topic: t, seenIn, problem, fix }) => ({ id, topic: t, seenIn, problem, fix })),
+    lessons: list.map(({ id, topic: t, seenIn, problem, fix, fixedIn, fixNote, changedIn, changeNote }) => {
+      let status = 'open';
+      if (fixedIn) status = cli ? (cmpVer(cli, fixedIn) >= 0 ? `fixed in your CLI (${fixedIn}+)` : `fixed in ${fixedIn} .. upgrade, or apply the fix`) : `fixed in ${fixedIn}`;
+      else if (changedIn) status = `improved in ${changedIn}, still applies`;
+      return { id, topic: t, status, seenIn, problem, fix, ...(fixNote || changeNote ? { update: fixNote ?? changeNote } : {}) };
+    }),
   };
 }
 
