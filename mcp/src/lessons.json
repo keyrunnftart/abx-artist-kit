@@ -1,0 +1,109 @@
+{
+  "testedCli": "0.2.0",
+  "lessons": [
+    {
+      "id": "collection-image-override",
+      "topic": "metadata",
+      "seenIn": "0.2.0",
+      "problem": "Attaching a collection-scope `image` field also becomes the default image of EVERY token, and it beats the render effect. Every thumbnail turns into your logo. It can't be cleared afterwards: the field store rejects empty values.",
+      "fix": "Never set collection `image`. Put the logo in `featured_image` and the banner in `banner_image` (collection-only keys).",
+      "detect": "preflight flags `attach <addr> image ... --collection`"
+    },
+    {
+      "id": "721c-base-mainnet",
+      "topic": "deploy",
+      "seenIn": "0.2.0",
+      "problem": "`--721c recommended` only resolves on testnets; the CLI has no recommended validator for Base mainnet.",
+      "fix": "Pass OpenSea's StrictAuthorizedTransferSecurityRegistry explicitly: --721c 0xA000027A9B2802E1ddf7000061001e5c005A0000 (same bytecode on Base mainnet). Once enrolled, only OpenSea-authorized secondary sales pass; the owner can suspend with `abx set-transfer-validator <addr> none`.",
+      "detect": "preflight checks --721c on chain base"
+    },
+    {
+      "id": "renderer-square-1000",
+      "topic": "render",
+      "seenIn": "0.2.0",
+      "problem": "ABX's hosted renderer captures thumbnails at 1000x1000 and ignores the `render.aspectRatio` param, so a portrait or landscape piece comes out letterboxed.",
+      "fix": "Design square, or accept letterboxed thumbnails (the live view is unaffected).",
+      "detect": "render_check reports the canvas aspect ratio"
+    },
+    {
+      "id": "renderer-10s-timeout",
+      "topic": "render",
+      "seenIn": "0.2.0",
+      "problem": "The hosted renderer waits about 10 s for `abx.done()`. A slower render is captured half-drawn.",
+      "fix": "Keep the slowest seed well under 10 s at 1000 px on an ordinary machine (target under 5 s). Call abx.done() only when the final frame is drawn.",
+      "detect": "render_check times every seed"
+    },
+    {
+      "id": "chunk-newline",
+      "topic": "script",
+      "seenIn": "0.2.0",
+      "problem": "Scripts over 22,000 bytes are split into chunks at newlines and re-joined with a newline. A 22 kB minified line can't be split safely.",
+      "fix": "Keep line breaks in the uploaded code; one chunk (under 22,000 bytes) is simplest.",
+      "detect": "lint_script"
+    },
+    {
+      "id": "onchain-uri-no-traits",
+      "topic": "metadata",
+      "seenIn": "0.2.0",
+      "problem": "With --onchain-uri the on-chain tokenURI carries a placeholder image and NO attributes; traits computed in JS only exist at the resolver. Marketplaces then show no image and no traits.",
+      "fix": "Use hosted metadata (--public-base-url https://resolver.abx.io). The code and seed stay on-chain either way; prove it with rebuild_token.",
+      "detect": "inspect_contract shows tokenURIBase/renderer"
+    },
+    {
+      "id": "opensea-placeholder-cache",
+      "topic": "marketplace",
+      "seenIn": "0.2.0",
+      "problem": "OpenSea indexes a fresh mint before its ABX render exists and caches the placeholder SVG and empty traits.",
+      "fix": "Refresh each new mint after the render lands (OpenSea API: POST /api/v2/chain/base/contract/<addr>/nfts/<id>/refresh, free key), sometimes several times. The item page shows the real art via animation_url meanwhile.",
+      "detect": "manual"
+    },
+    {
+      "id": "rpc-rate-limit",
+      "topic": "infra",
+      "seenIn": "0.2.0",
+      "problem": "mainnet.base.org rate-limits (HTTP 429) during normal mint-page polling and CLI reads.",
+      "fix": "Set ABX_RPC_URLS_BASE to a list, e.g. https://base-rpc.publicnode.com,https://base.drpc.org,https://mainnet.base.org, and use the same order on your mint page.",
+      "detect": "manual"
+    },
+    {
+      "id": "wallet-hijack",
+      "topic": "signing",
+      "seenIn": "0.2.0",
+      "problem": "Wallet extensions such as Temple take over window.ethereum, so the CLI's local signing page talks to the wrong wallet. MetaMask must also already be on the right network.",
+      "fix": "Disable other wallet extensions while signing; switch MetaMask to Base (8453) or Base Sepolia (84532) first; reload the signing page before each approval in a chained command.",
+      "detect": "manual"
+    },
+    {
+      "id": "math-random",
+      "topic": "script",
+      "seenIn": "0.2.0",
+      "problem": "Math.random, Date.now or performance-based randomness make a token render differently each time, so thumbnails, traits and the live view disagree. `abx inspect` also trips on Math.random.",
+      "fix": "Derive all randomness from abx.tokenData.seed (e.g. fold it into a 32-bit PRNG like mulberry32).",
+      "detect": "lint_script + render_check"
+    },
+    {
+      "id": "sponsored-deployer",
+      "topic": "deploy",
+      "seenIn": "0.2.0",
+      "problem": "--sponsor makes ABX's creator wallet sign and pay; that wallet shows as the contract creator on explorers forever.",
+      "fix": "Either deploy from your own wallet (a few cents of gas on Base), or sponsor setup and finish with `abx set-admin <addr> --to <your wallet> --sponsor` so you own it, and say so publicly.",
+      "detect": "preflight notes --sponsor without set-admin"
+    },
+    {
+      "id": "param-hooks-open",
+      "topic": "trust",
+      "seenIn": "0.2.0",
+      "problem": "Even with the script locked, the owner can still add a param hook (a transfer hook can block transfers or mints).",
+      "fix": "Once the sale setup is final, `abx lock-param-hooks <addr>` (1 tx) so collectors can trust nothing changes.",
+      "detect": "inspect_contract"
+    },
+    {
+      "id": "lock-script",
+      "topic": "trust",
+      "seenIn": "0.2.0",
+      "problem": "An unlocked script can be replaced by the owner at any time, which changes every token.",
+      "fix": "Test on testnet, then `abx lock-script <addr>` before the public sale.",
+      "detect": "inspect_contract"
+    }
+  ]
+}
