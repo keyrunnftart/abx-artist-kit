@@ -33,6 +33,10 @@ only some versions are stored on-chain (`list_libraries`): p5@1.0.0, three@0.124
 pick one of those and `rebuild_token` pulls the library bytes from ethereum, so the piece can still be rebuilt from chain data alone.
 zero-dependency vanilla js is the simplest fully on-chain path.
 
+checked on 4 oct 2026 with a p5 test project on base sepolia ([`0xa751…179F`](https://sepolia.basescan.org/address/0xa751722C9268cd5e660b04BD162852463D57179F), `--dep p5@1.0.0`):
+abx's live view loads p5 from jsdelivr; `rebuild_token` pulled the same p5 from ethereum (623 kB) and the code + seed from base,
+and drew the same image and traits as abx's render ([`test/fixtures/p5_compare.jpg`](test/fixtures/p5_compare.jpg): left rebuilt, right abx).
+
 ## lessons go stale
 
 abx is pre-1.0 and changes. every lesson says which cli version it was seen in (`src/lessons.json`).
