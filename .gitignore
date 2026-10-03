@@ -1,0 +1,4 @@
+node_modules/
+nhm_*.html
+*.png
+.env
