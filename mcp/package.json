@@ -1,6 +1,6 @@
 {
   "name": "abx-artist-kit-mcp",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "unofficial MCP for artists launching on ABX (Art Blocks' open protocol): rebuild from chain, lint, render check, preflight, launch lessons. read-only, never signs.",
   "type": "module",
   "bin": { "abx-artist-kit-mcp": "src/index.mjs" },

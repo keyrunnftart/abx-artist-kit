@@ -181,7 +181,7 @@ export function lintScript({ path, source }) {
 }
 
 // ---------- render_check ----------
-async function launchBrowser(chromePath) {
+export async function launchBrowser(chromePath) {
   let chromium;
   try { ({ chromium } = await import('playwright-core')); } catch {
     throw new Error('render_check needs playwright-core: npm i playwright-core (uses your installed Chrome)');

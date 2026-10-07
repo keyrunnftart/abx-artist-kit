@@ -13,6 +13,16 @@ export const CHAINS = {
   'robinhood-testnet': { id: 46630, rpcs: ['https://rpc.testnet.chain.robinhood.com', 'https://robinhood-sepolia-rpc.publicnode.com'], explorer: 'https://explorer.testnet.chain.robinhood.com' },
 };
 export const CHAIN_KEYS = Object.keys(CHAINS);
+// for eth_getLogs over wide ranges and reads of old state: drpc's free tier allows 10k-block log ranges, most others 50-500
+export const LOG_RPCS = {
+  base: ['https://mainnet.base.org', 'https://base.drpc.org'], ethereum: ['https://eth.drpc.org', 'https://ethereum-rpc.publicnode.com'],
+  arbitrum: ['https://arbitrum.drpc.org', 'https://arb1.arbitrum.io/rpc'], robinhood: ['https://robinhood.drpc.org', 'https://rpc.mainnet.chain.robinhood.com'],
+  'base-sepolia': ['https://base-sepolia.drpc.org', 'https://sepolia.base.org'], sepolia: ['https://ethereum-sepolia-rpc.publicnode.com', 'https://rpc.sepolia.org'],
+  'arbitrum-sepolia': ['https://arbitrum-sepolia.drpc.org', 'https://sepolia-rollup.arbitrum.io/rpc'], 'robinhood-testnet': ['https://rpc.testnet.chain.robinhood.com'],
+};
+// rollup family decides how the L1 data fee is read: op stack = GasPriceOracle, arbitrum orbit = NodeInterface
+export const ROLLUP = { base: 'op', 'base-sepolia': 'op', arbitrum: 'arb', 'arbitrum-sepolia': 'arb', robinhood: 'arb', 'robinhood-testnet': 'arb', ethereum: 'l1', sepolia: 'l1' };
+export const OPENSEA_SLUG = { base: 'base', ethereum: 'ethereum', arbitrum: 'arbitrum', sepolia: 'sepolia', 'base-sepolia': 'base_sepolia', 'arbitrum-sepolia': 'arbitrum_sepolia' };
 
 // Art Blocks DependencyRegistryV0 .. ABX resolves name@version libraries through it on Ethereum (1) and
 // Sepolia (11155111) only. Base, Arbitrum and Robinhood have none (checked on CLI 0.6.0).
@@ -55,8 +65,8 @@ export function chainOf(name = 'base') {
   return c;
 }
 
-async function rpcRequest(chain, method, params, rpc) {
-  const urls = rpc ? [rpc] : chainOf(chain).rpcs;
+export async function rpcRequest(chain, method, params, rpc, urlsOverride) {
+  const urls = rpc ? [rpc] : urlsOverride ?? chainOf(chain).rpcs;
   let last;
   for (const url of urls) {
     try {
@@ -68,7 +78,7 @@ async function rpcRequest(chain, method, params, rpc) {
       const j = await res.json();
       if (j.result !== undefined) return j.result;
       last = j.error?.message ?? JSON.stringify(j);
-      if (/revert/i.test(last)) throw Object.assign(new Error(last), { revert: true });
+      if (/revert/i.test(last) || (j.error?.data && /^0x[0-9a-f]{8}/i.test(String(j.error.data)))) throw Object.assign(new Error(last), { revert: true, data: j.error?.data });
     } catch (e) {
       if (e.revert) throw e;
       last = e.message;

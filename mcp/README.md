@@ -1,7 +1,7 @@
 # abx-artist-kit MCP
 
 unofficial MCP server for artists launching on [abx](https://docs.abx.io), art blocks' open protocol.
-it reads only. it never signs, holds keys or sends transactions.
+it reads only. it never signs, holds keys or sends transactions. the one exception is opt-in: `marketplace_check` with `refresh: true` asks opensea's api to refresh stale tokens.
 
 it doesn't wrap the abx cli (agents can run that directly). it adds what the cli doesn't:
 
@@ -14,6 +14,13 @@ it doesn't wrap the abx cli (agents can run that directly). it adds what the cli
 | `preflight` | checks planned abx commands for known launch pitfalls before anything is signed |
 | `list_libraries` | the libraries in art blocks' registry (p5, three, tone, …) and which versions are stored fully on-chain |
 | `lessons` | launch lessons the docs don't cover, tagged with the cli version they were seen in; warns when your cli is newer |
+| `deploy_cost` | what deploy + code upload costs on each abx chain at live gas, abx's own gas model plus the L1 data fee rollups add, in ETH and USD |
+| `edition_preview` | renders 10-400 fixed seeds into a contact sheet PNG with trait odds, rare values and unique combos .. see the edition before you deploy |
+| `mint_check` | simulates a mint from any wallet on the live minter (no signing): sold out, paused, balance vs price + fee, the revert reason in plain words |
+| `collectors` | every mint from chain logs: minters ranked, owner reserves flagged, verified ens names, traits, rare pulls per wallet .. for rewards and thank-yous |
+| `wave_status` | price, wave allocation, sold, left, mints in the last 24 h, last mint, sell-out time and when your next wave may open |
+| `export_token` | rebuilds a token from chain and renders it up to 8192 px as a PNG (print files, rewards) |
+| `marketplace_check` | compares each token's own metadata with OpenSea's copy (placeholder image, missing traits), refreshes only if you ask |
 
 ## install
 
@@ -62,6 +69,7 @@ a lesson is wrong or fixed? open an issue or a PR on that file.
 npm test                                   # every tool except render, against live contracts
 node test/client.mjs path/to/script.js     # over stdio like an agent, includes render_check
 node test/deps.mjs                         # p5 from the on-chain registry; seeded vs unseeded sketch
+node test/launch.mjs path/to/script.js out # the launch tools over stdio against "nothing here moves" (ALL=1 adds collectors)
 node scripts/abx-watch.mjs                 # the weekly check, locally
 ```
 

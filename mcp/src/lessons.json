@@ -135,6 +135,14 @@
       "problem": "ABX knows a recommended 721C validator for ethereum, sepolia, base and base-sepolia only. On arbitrum and robinhood `--721c recommended` fails: \"no recommended transfer validator is known\".",
       "fix": "Pass a validator you have checked on that chain by address, or leave 721C off (royalties then stay optional on marketplaces).",
       "detect": "preflight checks --721c per chain"
+    },
+    {
+      "id": "public-rpc-log-limits",
+      "topic": "infra",
+      "seenIn": "0.2.0",
+      "problem": "Reading who minted what needs eth_getLogs, and free public rpcs cap it hard: 50 blocks (1rpc), 500 (mainnet.base.org), 1k-10k on drpc depending on load, and some refuse old blocks without a key. Block-explorer APIs sit behind bot checks. A naive scan of a week of Base is hundreds of calls and gets rate-limited.",
+      "fix": "Use `collectors`: on chains with archive state it splits the block range on totalSupply(block) and only reads logs where supply changed (~30 s for a 42-mint collection from block 0, no keys); elsewhere it walks back from the latest block until every minted token is found. For wave status, totalSupply now minus totalSupply a day ago is the 24 h count.",
+      "detect": "collectors, wave_status"
     }
   ],
   "watch": {
