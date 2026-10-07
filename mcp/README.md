@@ -14,7 +14,7 @@ it doesn't wrap the abx cli (agents can run that directly). it adds what the cli
 | `preflight` | checks planned abx commands for known launch pitfalls before anything is signed |
 | `list_libraries` | the libraries in art blocks' registry (p5, three, tone, …) and which versions are stored fully on-chain |
 | `lessons` | launch lessons the docs don't cover, tagged with the cli version they were seen in; warns when your cli is newer |
-| `deploy_cost` | what deploy + code upload costs on each abx chain at live gas, abx's own gas model plus the L1 data fee rollups add, in ETH and USD |
+| `deploy_cost` | what deploy + code upload costs on each abx chain at live gas, abx's own gas model plus the L1 data fee rollups add, in ETH and USD, and whether abx pays it for you (`--sponsor`, base only) |
 | `edition_preview` | renders 10-400 fixed seeds into a contact sheet PNG with trait odds, rare values and unique combos .. see the edition before you deploy |
 | `mint_check` | simulates a mint from any wallet on the live minter (no signing): sold out, paused, balance vs price + fee, the revert reason in plain words |
 | `collectors` | every mint from chain logs: minters ranked, owner reserves flagged, verified ens names, traits, rare pulls per wallet .. for rewards and thank-yous |
@@ -41,7 +41,8 @@ chains: every network abx 0.6.0 ships, with abx's own public rpcs by default (`r
 | `robinhood` 4663 | `robinhood-testnet` 46630 |
 
 `preflight` knows what differs per chain: `--721c recommended` resolves on ethereum, sepolia, base and base-sepolia only,
-ethereum needs cli 0.5.0+ and costs far more gas to store code, and only ethereum + sepolia have art blocks' library registry.
+ethereum needs cli 0.5.0+ and costs far more gas to store code, only ethereum + sepolia have art blocks' library registry,
+and `--sponsor` (abx pays the gas) only exists on base and base-sepolia, everywhere else your wallet pays.
 
 ## p5 and other libraries
 

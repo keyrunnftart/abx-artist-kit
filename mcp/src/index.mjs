@@ -10,7 +10,7 @@ import { listLibraries } from './deps.mjs';
 import { CHAIN_KEYS } from './chain.mjs';
 import { deployCost, editionPreview, mintCheck, collectors, waveStatus, exportToken, marketplaceCheck } from './launch.mjs';
 
-const server = new McpServer({ name: 'abx-artist-kit', version: '0.4.0' });
+const server = new McpServer({ name: 'abx-artist-kit', version: '0.4.1' });
 
 const chain = z.enum(CHAIN_KEYS).default('base').describe('abx chain: base (8453), ethereum (1), arbitrum (42161), robinhood (4663), or a testnet: base-sepolia, sepolia, arbitrum-sepolia, robinhood-testnet');
 const address = z.string().regex(/^0x[0-9a-fA-F]{40}$/).describe('ABX contract address');

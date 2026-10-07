@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
-  SEL, ZERO, CHAINS, LOG_RPCS, ROLLUP, OPENSEA_SLUG, chainOf, rpcRequest, tryCall, ethCall, word, addrWord, words, asAddr, asUint, asBool, decodeString,
+  SEL, ZERO, CHAINS, LOG_RPCS, ROLLUP, OPENSEA_SLUG, SPONSORED_CHAINS, chainOf, rpcRequest, tryCall, ethCall, word, addrWord, words, asAddr, asUint, asBool, decodeString,
 } from './chain.mjs';
 import { resolveDependency } from './deps.mjs';
 import { buildDocument, tokenDataJson } from './html.mjs';
@@ -164,6 +164,9 @@ export async function deployCost({ path, bytes, chains = ['base', 'ethereum', 'a
   let txs = 1, cur = 0; for (const g of packGas) { if (cur && cur + g > 8_000_000) { txs++; cur = 0; } cur += g; } if (chunks) txs++;
   const sample = script ?? Buffer.from(Array.from({ length: n }, (_, i) => 32 + ((i * 7919) % 90)));
   const usd = await ethUsd();
+  let sponsoredIds = SPONSORED_CHAINS, sponsorSource = 'kit default (checked 7 oct 2026)';
+  try { const d = await (await fetch('https://services.abx.io/.well-known/abx-service', { headers: { 'user-agent': 'abx-artist-kit' } })).json();
+    const c = d?.endpoints?.['abx-creator-wallet/v1']?.chains; if (Array.isArray(c)) { sponsoredIds = c; sponsorSource = 'live abx services catalog'; } } catch {}
   const rows = await pool(chains, 4, async (ch) => {
     try {
       const gp = BigInt(await rpcRequest(ch, 'eth_gasPrice', []));
@@ -172,13 +175,14 @@ export async function deployCost({ path, bytes, chains = ['base', 'ethereum', 'a
       const deployL1 = await l1Fee(ch, Buffer.alloc(1200, 1), null);
       const total = exec + (l1 ?? 0n) + (deployL1 ?? 0n);
       return { chain: ch, gasPriceGwei: round(Number(gp) / 1e9, 4), executionEth: round(eth(exec), 8), l1DataEth: l1 == null ? null : round(eth(l1 + (deployL1 ?? 0n)), 8),
-        totalEth: round(eth(total), 8), totalUsd: usd ? round(eth(total) * usd, 2) : null };
+        totalEth: round(eth(total), 8), totalUsd: usd ? round(eth(total) * usd, 2) : null,
+        sponsor: sponsoredIds.includes(CHAINS[ch].id) ? 'abx pays all of this with --sponsor (then hand ownership to your wallet with set-admin)' : 'not sponsored here .. your wallet pays' };
     } catch (e) { return { chain: ch, error: e.message.slice(0, 120) }; }
   });
   return {
     scriptBytes: n, chunks, transactions: txs, gasApprox: gas,
     model: 'abx cli 0.6.0 dry-run model: 250k clone+init, 34k + 216/byte per stored chunk, 45k/schema, 55k/dependency, 65k/mint (+80k sale configure, our estimate), priced at the live gas price, plus each rollup\'s L1 data fee for the bytes',
-    ethUsd: usd, chains: rows.sort((a, b) => (a.totalEth ?? 1e9) - (b.totalEth ?? 1e9)),
+    ethUsd: usd, sponsoredChains: { ids: sponsoredIds, source: sponsorSource }, chains: rows.sort((a, b) => (a.totalEth ?? 1e9) - (b.totalEth ?? 1e9)),
     note: 'order-of-magnitude, not a quote. gas prices move by the minute (ethereum most). `abx deploy --dry-run` prints abx\'s own figure; the wallet shows the real fee before you sign.',
   };
 }

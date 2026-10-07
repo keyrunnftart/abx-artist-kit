@@ -58,7 +58,7 @@
       "topic": "marketplace",
       "seenIn": "0.2.0",
       "problem": "OpenSea indexes a fresh mint before its ABX render exists and caches the placeholder SVG and empty traits.",
-      "fix": "Refresh each new mint after the render lands (OpenSea API: POST /api/v2/chain/base/contract/<addr>/nfts/<id>/refresh, free key), sometimes several times. The item page shows the real art via animation_url meanwhile.",
+      "fix": "Refresh each new mint after the render lands (OpenSea API: POST /api/v2/chain/<chain>/contract/<addr>/nfts/<id>/refresh, free key, or marketplace_check with refresh: true), sometimes several times. The item page shows the real art via animation_url meanwhile.",
       "detect": "manual"
     },
     {
@@ -76,7 +76,7 @@
       "topic": "signing",
       "seenIn": "0.2.0",
       "problem": "Wallet extensions such as Temple take over window.ethereum, so the CLI's local signing page talks to the wrong wallet. MetaMask must also already be on the right network.",
-      "fix": "Disable other wallet extensions while signing; switch MetaMask to Base (8453) or Base Sepolia (84532) first; reload the signing page before each approval in a chained command.",
+      "fix": "Disable other wallet extensions while signing; switch MetaMask to the chain you deploy on first (Base is 8453, Ethereum 1, Arbitrum 42161, Robinhood 4663); reload the signing page before each approval in a chained command.",
       "detect": "manual"
     },
     {
@@ -92,7 +92,7 @@
       "topic": "deploy",
       "seenIn": "0.2.0",
       "problem": "--sponsor makes ABX's creator wallet sign and pay; that wallet shows as the contract creator on explorers forever.",
-      "fix": "Either deploy from your own wallet (a few cents of gas on Base), or sponsor setup and finish with `abx set-admin <addr> --to <your wallet> --sponsor` so you own it, and say so publicly.",
+      "fix": "Either deploy from your own wallet (on Base a deploy + upload is a few cents), or sponsor setup and finish with `abx set-admin <addr> --to <your wallet> --sponsor` so you own it, and say so publicly. Sponsoring only exists on base and base-sepolia (lesson sponsor-base-only).",
       "detect": "preflight notes --sponsor without set-admin"
     },
     {
@@ -124,8 +124,8 @@
       "id": "ethereum-beta",
       "topic": "deploy",
       "seenIn": "0.5.0",
-      "problem": "Ethereum mainnet became an opt-in production-beta network in abx CLI/SDK 0.5.0 (5 Oct 2026), after Arbitrum (0.4.0) and Robinhood Chain. Older CLIs don't know it, and gas for storing the code on L1 is far higher than on Base.",
-      "fix": "Use CLI 0.5.0+ with ABX_CHAIN=ethereum, rehearse the exact commands on sepolia first and price the deploy + code upload there. Name@version libraries resolve from Art Blocks' registry on Ethereum, and `--721c recommended` resolves to OpenSea's registry 0xA000027A…0000.",
+      "problem": "Ethereum mainnet became an opt-in production-beta network in abx CLI/SDK 0.5.0 (5 Oct 2026), after Robinhood Chain (0.1.0) and Arbitrum (0.4.0). Older CLIs don't know it, abx doesn't sponsor gas there, and storing the code on L1 costs far more than on Base.",
+      "fix": "Use CLI 0.5.0+ with ABX_CHAIN=ethereum and your own wallet (no --sponsor), check the cost with deploy_cost, and rehearse the exact commands on sepolia first. Name@version libraries resolve from Art Blocks' registry on Ethereum, and `--721c recommended` resolves to OpenSea's registry 0xA000027A…0000.",
       "detect": "preflight (chain ethereum)"
     },
     {
@@ -141,8 +141,16 @@
       "topic": "infra",
       "seenIn": "0.2.0",
       "problem": "Reading who minted what needs eth_getLogs, and free public rpcs cap it hard: 50 blocks (1rpc), 500 (mainnet.base.org), 1k-10k on drpc depending on load, and some refuse old blocks without a key. Block-explorer APIs sit behind bot checks. A naive scan of a week of Base is hundreds of calls and gets rate-limited.",
-      "fix": "Use `collectors`: on chains with archive state it splits the block range on totalSupply(block) and only reads logs where supply changed (~30 s for a 42-mint collection from block 0, no keys); elsewhere it walks back from the latest block until every minted token is found. For wave status, totalSupply now minus totalSupply a day ago is the 24 h count.",
+      "fix": "Use `collectors`: on chains with archive state it splits the block range on totalSupply(block) and only reads logs where supply changed (30-60 s for a 42-mint collection from block 0, no keys); elsewhere it walks back from the latest block until every minted token is found. For wave status, totalSupply now minus totalSupply a day ago is the 24 h count.",
       "detect": "collectors, wave_status"
+    },
+    {
+      "id": "sponsor-base-only",
+      "topic": "deploy",
+      "seenIn": "0.6.0",
+      "problem": "`--sponsor` (abx services pays the gas) only works on base and base-sepolia: the services catalog lists abx-creator-wallet/v1 for chains 8453 and 84532, and the CLI refuses other chains (\"the ABX creator-wallet service does not support chain …\"). On a sponsored Base launch the artist pays only the owner txs signed from their own wallet (for nothing here moves: two wave openings, ~0.000004 ETH in total), and collectors pay normal mint gas (~0.0000014 ETH per mint on Base).",
+      "fix": "On ethereum, arbitrum and robinhood sign from your own wallet and budget for it (deploy_cost). On base, sponsor if you like, then hand ownership over with set-admin (lesson sponsored-deployer).",
+      "detect": "preflight (--sponsor per chain), deploy_cost"
     }
   ],
   "watch": {
@@ -176,6 +184,10 @@
     "registryChains": [
       1,
       11155111
+    ],
+    "sponsorChains": [
+      8453,
+      84532
     ]
   }
 }

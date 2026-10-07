@@ -60,6 +60,11 @@ if (keys.length) check(JSON.stringify(keys) === JSON.stringify(W.chains), `chain
 const ids = (m) => Object.keys(m ?? {}).map(Number).sort((a, b) => a - b);
 if (sdk.RECOMMENDED_TRANSFER_VALIDATOR) check(JSON.stringify(ids(sdk.RECOMMENDED_TRANSFER_VALIDATOR)) === JSON.stringify([...W.validatorChains].sort((a, b) => a - b)), `721C validator known on chains ${W.validatorChains.join(', ')}`, `**721C validator chains changed:** ${ids(sdk.RECOMMENDED_TRANSFER_VALIDATOR).join(', ')} (lesson 721c-other-chains, src/chain.mjs RECOMMENDED_721C)`);
 if (sdk.AB_DEPENDENCY_REGISTRY) check(JSON.stringify(ids(sdk.AB_DEPENDENCY_REGISTRY)) === JSON.stringify([...W.registryChains].sort((a, b) => a - b)), `library registry on chains ${W.registryChains.join(', ')}`, `**library registry chains changed:** ${ids(sdk.AB_DEPENDENCY_REGISTRY).join(', ')} (lesson base-no-dependency-registry)`);
+try {
+  const cat = await (await fetch('https://services.abx.io/.well-known/abx-service')).json();
+  const sc = (cat?.endpoints?.['abx-creator-wallet/v1']?.chains ?? []).map(Number).sort((a, b) => a - b);
+  check(JSON.stringify(sc) === JSON.stringify([...W.sponsorChains].sort((a, b) => a - b)), `gas sponsorship on chains ${sc.join(', ')}`, `**abx gas sponsorship chains changed:** ${W.sponsorChains.join(', ')} → ${sc.join(', ')} (lesson sponsor-base-only, src/chain.mjs SPONSORED_CHAINS)`);
+} catch (e) { changes.push(`could not read the abx services catalog: ${e.message}`); }
 
 // 5. live: rebuild a known token, code must hash the same
 try {

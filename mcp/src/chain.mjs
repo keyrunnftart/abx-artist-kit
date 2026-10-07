@@ -27,6 +27,10 @@ export const OPENSEA_SLUG = { base: 'base', ethereum: 'ethereum', arbitrum: 'arb
 // Art Blocks DependencyRegistryV0 .. ABX resolves name@version libraries through it on Ethereum (1) and
 // Sepolia (11155111) only. Base, Arbitrum and Robinhood have none (checked on CLI 0.6.0).
 export const AB_DEPENDENCY_REGISTRY = { 1: '0x37861f95882ACDba2cCD84F5bFc4598e2ECDDdAF', 11155111: '0x5Fcc415BCFb164C5F826B5305274749BeB684e9b' };
+// chains where abx services pays gas for `--sponsor` (abx-creator-wallet/v1 in https://services.abx.io/.well-known/abx-service,
+// checked 7 oct 2026). everywhere else the artist's own wallet pays.
+export const SPONSORED_CHAINS = [8453, 84532];
+export const isSponsored = (chain) => SPONSORED_CHAINS.includes(CHAINS[chain]?.id);
 export const hasDependencyRegistry = (chain) => !!AB_DEPENDENCY_REGISTRY[CHAINS[chain]?.id];
 
 // ABX's recommended 721C validator (OpenSea's StrictAuthorizedTransferSecurityRegistry) .. known for these chains only

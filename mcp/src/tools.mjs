@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url';
 import { execFile } from 'node:child_process';
 import {
   SEL, ZERO, chainOf, tryCall, word, addrWord, words, asAddr, asUint, asBool,
-  decodeString, decodeKeys, readScript, readSeed, readDependencies, hasDependencyRegistry, RECOMMENDED_721C, CHAINS,
+  decodeString, decodeKeys, readScript, readSeed, readDependencies, hasDependencyRegistry, RECOMMENDED_721C, CHAINS, isSponsored,
 } from './chain.mjs';
 import { resolveDependency } from './deps.mjs';
 import { buildDocument, tokenDataJson } from './html.mjs';
@@ -314,7 +314,10 @@ export function preflight({ commands, chain, cliVersion }) {
     }
     if (/\babx\s+set-admin\b/.test(l)) setAdmin = true;
     if (/\babx\s+lock-script\b/.test(l)) lockScript = true;
-    if (/\bsponsor\b/.test(l) && /--sponsor\b/.test(l)) sponsored = true;
+    if (/--sponsor\b/.test(l)) {
+      sponsored = true;
+      if (ch && CHAINS[ch] && !isSponsored(ch)) add('error', `--sponsor on ${ch}: abx only pays gas on base and base-sepolia .. drop --sponsor and sign from your own wallet (it pays the gas)`, 'sponsor-base-only');
+    }
   }
   if (sponsored && !setAdmin) add('warn', '--sponsor without set-admin .. ABX\'s creator wallet stays owner/creator', 'sponsored-deployer');
   if (deploy && !lockScript) add('info', 'no lock-script in this plan .. lock before the public sale', 'lock-script');

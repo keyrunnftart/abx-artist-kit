@@ -4,3 +4,4 @@ nhm_*.html
 .env
 share_notes.txt
 mcp/report.md
+share/
