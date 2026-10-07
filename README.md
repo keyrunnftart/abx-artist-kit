@@ -13,7 +13,9 @@ works on every chain abx ships: base, ethereum, arbitrum, robinhood and their te
 install (claude code, one line):
 
 ```
-claude mcp add abx-artist-kit -- npx -y github:keyrunnftart/abx-artist-kit
+claude mcp add abx-artist-kit -- npx -y abx-artist-kit
 ```
+
+[npm](https://www.npmjs.com/package/abx-artist-kit) .. or straight from github: `npx -y github:keyrunnftart/abx-artist-kit`
 
 MIT
