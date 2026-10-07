@@ -2,6 +2,25 @@
 // abx-artist-kit MCP .. unofficial helper for artists launching on ABX (Art Blocks' open protocol).
 // read-only: it never signs, never holds keys, never sends transactions.
 
+// run by hand in a terminal (not by an MCP client): print how to add it instead of waiting silently on stdin
+const ARGS = process.argv.slice(2);
+if (ARGS.includes('--version') || ARGS.includes('-v')) { console.log('abx-artist-kit 0.4.2'); process.exit(0); }
+if (ARGS.includes('--help') || ARGS.includes('-h') || process.stdin.isTTY) {
+  console.log(`abx-artist-kit 0.4.2 .. unofficial MCP for artists launching on abx (read-only, never signs)
+
+this is an MCP server: your agent starts it, you don't run it by hand.
+
+claude code:
+  claude mcp add abx-artist-kit -- npx -y abx-artist-kit
+
+any other MCP client (claude desktop, cursor, ...), add to its mcp config:
+  { "mcpServers": { "abx-artist-kit": { "command": "npx", "args": ["-y", "abx-artist-kit"] } } }
+
+render tools (render_check, edition_preview, export_token) use your installed chrome.
+docs: https://github.com/keyrunnftart/abx-artist-kit`);
+  process.exit(0);
+}
+
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
@@ -10,7 +29,7 @@ import { listLibraries } from './deps.mjs';
 import { CHAIN_KEYS } from './chain.mjs';
 import { deployCost, editionPreview, mintCheck, collectors, waveStatus, exportToken, marketplaceCheck } from './launch.mjs';
 
-const server = new McpServer({ name: 'abx-artist-kit', version: '0.4.1' });
+const server = new McpServer({ name: 'abx-artist-kit', version: '0.4.2' });
 
 const chain = z.enum(CHAIN_KEYS).default('base').describe('abx chain: base (8453), ethereum (1), arbitrum (42161), robinhood (4663), or a testnet: base-sepolia, sepolia, arbitrum-sepolia, robinhood-testnet');
 const address = z.string().regex(/^0x[0-9a-fA-F]{40}$/).describe('ABX contract address');

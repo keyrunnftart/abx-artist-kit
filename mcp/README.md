@@ -24,6 +24,20 @@ it doesn't wrap the abx cli (agents can run that directly). it adds what the cli
 
 ## install
 
+one line, nothing to clone:
+
+```
+claude mcp add abx-artist-kit -- npx -y github:keyrunnftart/abx-artist-kit
+```
+
+other MCP clients (claude desktop, cursor, ...):
+
+```json
+{ "mcpServers": { "abx-artist-kit": { "command": "npx", "args": ["-y", "github:keyrunnftart/abx-artist-kit"] } } }
+```
+
+from source (to change it):
+
 ```
 git clone https://github.com/keyrunnftart/abx-artist-kit
 cd abx-artist-kit/mcp && npm install

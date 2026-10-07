@@ -1,0 +1,22 @@
+{
+  "name": "abx-artist-kit",
+  "version": "0.4.2",
+  "description": "unofficial MCP for artists launching on ABX (Art Blocks' open protocol): deploy cost per chain, edition preview, preflight, mint check, collectors, rebuild from chain. read-only, never signs.",
+  "type": "module",
+  "bin": { "abx-artist-kit": "mcp/src/index.mjs" },
+  "main": "mcp/src/index.mjs",
+  "files": ["mcp/src/", "mcp/README.md", "proof/rebuild.mjs", "README.md", "LICENSE"],
+  "engines": { "node": ">=18" },
+  "keywords": ["mcp", "abx", "art-blocks", "generative-art", "nft", "base", "ethereum", "claude"],
+  "license": "MIT",
+  "author": "KeyRun",
+  "homepage": "https://github.com/keyrunnftart/abx-artist-kit#readme",
+  "repository": { "type": "git", "url": "git+https://github.com/keyrunnftart/abx-artist-kit.git" },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.0",
+    "zod": "^3.25.0"
+  },
+  "optionalDependencies": {
+    "playwright-core": "^1.48.0"
+  }
+}
