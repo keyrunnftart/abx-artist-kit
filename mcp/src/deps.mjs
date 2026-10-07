@@ -89,6 +89,6 @@ export async function listLibraries() {
   return {
     registry: `${ETH_REGISTRY} (Ethereum)`,
     libraries: out,
-    note: 'ABX reads this registry on Ethereum/Sepolia only. On Base, declare a library as name@version and ABX\'s live view loads it from a CDN; rebuild_token still pulls the on-chain copy from Ethereum when one exists. For a Base-only on-chain library, deploy it as a data contract and add it by address.',
+    note: "ABX reads this registry on Ethereum/Sepolia only, so on ethereum a name@version library is served from chain. On Base, Arbitrum and Robinhood, ABX's live view loads a name@version library from a CDN; rebuild_token still pulls the on-chain copy from Ethereum when one exists. For an on-chain library on those chains, deploy it as a data contract and add it by address.",
   };
 }

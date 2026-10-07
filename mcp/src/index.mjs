@@ -7,12 +7,13 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { rebuildToken, inspectContract, lintScript, renderCheck, preflight, lessons } from './tools.mjs';
 import { listLibraries } from './deps.mjs';
+import { CHAIN_KEYS } from './chain.mjs';
 
-const server = new McpServer({ name: 'abx-artist-kit', version: '0.2.0' });
+const server = new McpServer({ name: 'abx-artist-kit', version: '0.3.0' });
 
-const chain = z.enum(['base', 'base-sepolia']).default('base').describe('base (mainnet, 8453) or base-sepolia (84532)');
+const chain = z.enum(CHAIN_KEYS).default('base').describe('abx chain: base (8453), ethereum (1), arbitrum (42161), robinhood (4663), or a testnet: base-sepolia, sepolia, arbitrum-sepolia, robinhood-testnet');
 const address = z.string().regex(/^0x[0-9a-fA-F]{40}$/).describe('ABX contract address');
-const rpc = z.string().url().optional().describe('optional RPC URL; defaults to public Base RPCs');
+const rpc = z.string().url().optional().describe('optional RPC URL; defaults to the public RPCs abx ships for that chain');
 
 const wrap = (fn) => async (args) => {
   try {
@@ -50,7 +51,7 @@ server.registerTool('render_check', {
     timeoutSec: z.number().int().min(5).max(120).default(20),
     chromePath: z.string().optional(),
     dependencies: z.array(z.string()).default([]).describe('libraries in --dep order, e.g. ["p5@1.9.0"] or a 0x data-contract address'),
-    chain: z.enum(['base', 'base-sepolia']).default('base').describe('chain for 0x data-contract dependencies'),
+    chain: z.enum(CHAIN_KEYS).default('base').describe('chain for 0x data-contract dependencies'),
   },
 }, wrap(renderCheck));
 
@@ -59,7 +60,7 @@ server.registerTool('preflight', {
   description: 'Checks planned abx CLI commands (deploy, attach, set-admin, lock-script, ...) against known launch pitfalls before anything is signed: 721C on Base mainnet, collection image override, on-chain URI without traits, sponsor without handover, missing payee/max/minter, royalty, script lock.',
   inputSchema: {
     commands: z.string().describe('the commands you plan to run, one per line'),
-    chain: z.enum(['base', 'base-sepolia']).optional(),
+    chain: z.enum(CHAIN_KEYS).optional(),
     cliVersion: z.string().optional().describe('your abx-cli version (abx --version); some pitfalls are fixed in newer versions'),
   },
 }, wrap(preflight));

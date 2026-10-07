@@ -1,5 +1,5 @@
 {
-  "testedCli": "0.4.2",
+  "testedCli": "0.6.0",
   "lessons": [
     {
       "id": "collection-image-override",
@@ -115,9 +115,26 @@
       "id": "base-no-dependency-registry",
       "topic": "script",
       "seenIn": "0.2.0",
-      "problem": "ABX only knows Art Blocks' dependency registry on Ethereum and Sepolia. On Base a `--dep p5@1.9.0` reference has no registry, so ABX's resolver loads the library from a CDN (jsdelivr): the live view depends on that CDN, not on chain data.",
-      "fix": "Zero-dependency vanilla JS is the fully on-chain path. If you need a library, pick a version stored on-chain in Art Blocks' registry (list_libraries) so the piece can still be rebuilt from chain data (rebuild_token pulls it from Ethereum), or deploy the library as a data contract on Base and add it with `--dep 0x…`.",
-      "detect": "lint_script, rebuild_token, list_libraries"
+      "problem": "ABX only knows Art Blocks' dependency registry on Ethereum and Sepolia. On Base, Arbitrum and Robinhood a `--dep p5@1.9.0` reference has no registry, so ABX's resolver loads the library from a CDN (jsdelivr): the live view depends on that CDN, not on chain data.",
+      "fix": "Zero-dependency vanilla JS is the fully on-chain path on every chain. On Ethereum (CLI 0.5.0+) a name@version library resolves from Art Blocks' registry on chain, so pick a version stored fully on-chain (list_libraries). Elsewhere, pick such a version anyway so the piece can still be rebuilt from chain data (rebuild_token pulls it from Ethereum), or deploy the library as a data contract on your chain and add it with `--dep 0x…`.",
+      "detect": "lint_script, rebuild_token, list_libraries",
+      "checkedIn": "0.6.0"
+    },
+    {
+      "id": "ethereum-beta",
+      "topic": "deploy",
+      "seenIn": "0.5.0",
+      "problem": "Ethereum mainnet became an opt-in production-beta network in abx CLI/SDK 0.5.0 (5 Oct 2026), after Arbitrum (0.4.0) and Robinhood Chain. Older CLIs don't know it, and gas for storing the code on L1 is far higher than on Base.",
+      "fix": "Use CLI 0.5.0+ with ABX_CHAIN=ethereum, rehearse the exact commands on sepolia first and price the deploy + code upload there. Name@version libraries resolve from Art Blocks' registry on Ethereum, and `--721c recommended` resolves to OpenSea's registry 0xA000027A…0000.",
+      "detect": "preflight (chain ethereum)"
+    },
+    {
+      "id": "721c-other-chains",
+      "topic": "deploy",
+      "seenIn": "0.6.0",
+      "problem": "ABX knows a recommended 721C validator for ethereum, sepolia, base and base-sepolia only. On arbitrum and robinhood `--721c recommended` fails: \"no recommended transfer validator is known\".",
+      "fix": "Pass a validator you have checked on that chain by address, or leave 721C off (royalties then stay optional on marketplaces).",
+      "detect": "preflight checks --721c per chain"
     }
   ],
   "watch": {
@@ -131,6 +148,26 @@
       "chain": "base",
       "tokenId": 2,
       "codeSha256": "4c90b322e0afb34df4c2b4233125e5144d5e62dc0fb22a18b34caa5a72060209"
-    }
+    },
+    "chains": [
+      "arbitrum",
+      "arbitrum-sepolia",
+      "base",
+      "base-sepolia",
+      "ethereum",
+      "robinhood",
+      "robinhood-testnet",
+      "sepolia"
+    ],
+    "validatorChains": [
+      1,
+      11155111,
+      84532,
+      8453
+    ],
+    "registryChains": [
+      1,
+      11155111
+    ]
   }
 }

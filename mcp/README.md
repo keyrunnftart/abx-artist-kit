@@ -24,11 +24,22 @@ claude mcp add abx-artist-kit -- node /full/path/abx-artist-kit/mcp/src/index.mj
 ```
 
 node 18+. `render_check` uses your installed chrome through playwright-core.
-chains: `base` (8453) and `base-sepolia` (84532), public rpcs by default, `rpc` to use your own.
+chains: every network abx 0.6.0 ships, with abx's own public rpcs by default (`rpc` to use your own):
 
-## p5 and other libraries on base
+| production (abx beta) | testnet |
+|---|---|
+| `base` 8453 | `base-sepolia` 84532 |
+| `ethereum` 1 (abx 0.5.0+) | `sepolia` 11155111 |
+| `arbitrum` 42161 | `arbitrum-sepolia` 421614 |
+| `robinhood` 4663 | `robinhood-testnet` 46630 |
 
-abx only knows art blocks' library registry on ethereum and sepolia. on base, `--dep p5@1.9.0` makes abx's live view load p5 from a cdn.
+`preflight` knows what differs per chain: `--721c recommended` resolves on ethereum, sepolia, base and base-sepolia only,
+ethereum needs cli 0.5.0+ and costs far more gas to store code, and only ethereum + sepolia have art blocks' library registry.
+
+## p5 and other libraries
+
+abx only knows art blocks' library registry on ethereum and sepolia. there, `--dep p5@1.0.0` is served from chain.
+on base, arbitrum and robinhood, `--dep p5@1.9.0` makes abx's live view load p5 from a cdn.
 only some versions are stored on-chain (`list_libraries`): p5@1.0.0, three@0.124.0, cannon-es@0.20.0 as of oct 2026.
 pick one of those and `rebuild_token` pulls the library bytes from ethereum, so the piece can still be rebuilt from chain data alone.
 zero-dependency vanilla js is the simplest fully on-chain path.
@@ -42,7 +53,7 @@ and drew the same image and traits as abx's render ([`test/fixtures/p5_compare.j
 abx is pre-1.0 and changes. every lesson says which cli version it was seen in (`src/lessons.json`).
 when your cli is newer, `lessons` says so, and each lesson shows `fixed in x.y.z` once abx fixes it.
 every monday a github action (`abx watch`) installs the latest abx, checks the contract functions, the page abx builds around a script,
-the base 721C validator and library registry, and rebuilds a live token. if anything changed it opens an issue with the changelog.
+the chain list, where abx knows a 721C validator and a library registry, and rebuilds a live token. if anything changed it opens an issue with the changelog.
 a lesson is wrong or fixed? open an issue or a PR on that file.
 
 ## test

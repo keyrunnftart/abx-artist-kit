@@ -54,6 +54,13 @@ check((v8453 ?? '').toLowerCase() === (W.validator8453 ?? '').toLowerCase(), `ba
 const reg8453 = sdk.AB_DEPENDENCY_REGISTRY?.[8453] ?? null;
 check(reg8453 === W.depRegistry8453, reg8453 ? `base dependency registry ${reg8453}` : 'still no dependency registry on base', `**base dependency registry changed:** ${W.depRegistry8453} → ${reg8453} (lesson base-no-dependency-registry may be fixed)`);
 
+// 4b. which chains abx supports, and where it knows a 721C validator / art blocks library registry
+const keys = Object.keys(sdk.CHAINS ?? {}).sort();
+if (keys.length) check(JSON.stringify(keys) === JSON.stringify(W.chains), `chains unchanged: ${keys.join(', ')}`, `**abx chains changed:** ${W.chains.join(', ')} → ${keys.join(', ')} (add them to src/chain.mjs CHAINS)`);
+const ids = (m) => Object.keys(m ?? {}).map(Number).sort((a, b) => a - b);
+if (sdk.RECOMMENDED_TRANSFER_VALIDATOR) check(JSON.stringify(ids(sdk.RECOMMENDED_TRANSFER_VALIDATOR)) === JSON.stringify([...W.validatorChains].sort((a, b) => a - b)), `721C validator known on chains ${W.validatorChains.join(', ')}`, `**721C validator chains changed:** ${ids(sdk.RECOMMENDED_TRANSFER_VALIDATOR).join(', ')} (lesson 721c-other-chains, src/chain.mjs RECOMMENDED_721C)`);
+if (sdk.AB_DEPENDENCY_REGISTRY) check(JSON.stringify(ids(sdk.AB_DEPENDENCY_REGISTRY)) === JSON.stringify([...W.registryChains].sort((a, b) => a - b)), `library registry on chains ${W.registryChains.join(', ')}`, `**library registry chains changed:** ${ids(sdk.AB_DEPENDENCY_REGISTRY).join(', ')} (lesson base-no-dependency-registry)`);
+
 // 5. live: rebuild a known token, code must hash the same
 try {
   const r = await rebuildToken({ ...W.liveToken, outDir: dir });

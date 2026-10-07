@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url';
 import { execFile } from 'node:child_process';
 import {
   SEL, ZERO, chainOf, tryCall, word, addrWord, words, asAddr, asUint, asBool,
-  decodeString, decodeKeys, readScript, readSeed, readDependencies,
+  decodeString, decodeKeys, readScript, readSeed, readDependencies, hasDependencyRegistry, RECOMMENDED_721C, CHAINS,
 } from './chain.mjs';
 import { resolveDependency } from './deps.mjs';
 import { buildDocument, tokenDataJson } from './html.mjs';
@@ -45,7 +45,7 @@ export async function rebuildToken({ contract, tokenId, chain = 'base', rpc, out
   if (seed.isHash) warn.push('the seed is stored as a hash, not a literal .. this rebuild passes the hash');
   if (extra.length) warn.push(`the program may also read: ${extra.join(', ')} .. not passed in this rebuild, so it may differ`);
   for (const l of libs) if (!l.onchain) warn.push(`library ${l.name}: ${l.note} (${l.source})`);
-  if (libs.some((l) => l.onchain && /Ethereum/.test(l.source)) && chain !== 'ethereum')
+  if (libs.some((l) => l.onchain && /Ethereum/.test(l.source)) && !hasDependencyRegistry(chain))
     warn.push(`library bytes come from Art Blocks' registry on Ethereum; ABX's own live view on ${chain} loads them from a CDN ${cite('base-no-dependency-registry')}`);
   if (urls.length) warn.push(`the code references ${urls.length} external URL(s): ${[...new Set(urls)].slice(0, 5).join(' ')}`);
   return {
@@ -284,12 +284,17 @@ export function preflight({ commands, chain, cliVersion }) {
       deploy = true;
       if (!ch) add('warn', 'no ABX_CHAIN on the deploy line .. say which chain explicitly');
       const v = flag(l, '721c');
+      if (ch && CHAINS[ch] && v === 'recommended' && !RECOMMENDED_721C[CHAINS[ch].id])
+        add('error', `--721c recommended has no answer on ${ch} (abx knows a recommended validator for ethereum, sepolia, base, base-sepolia only) .. pass a validator address or leave --721c off`, '721c-other-chains');
+      if (ch === 'ethereum' && cliVersion && cmpVer(cliVersion, '0.5.0') < 0) add('error', `ethereum needs abx CLI 0.5.0+ (you have ${cliVersion})`, 'ethereum-beta');
+      if (ch === 'ethereum') add('info', 'ethereum mainnet: code is stored in L1 calldata/bytecode, so deploy + upload gas is far higher than on base .. run it on sepolia first and check the cost', 'ethereum-beta');
       if (ch === 'base' && v === 'recommended') {
         if (!cliVersion) add('warn', '--721c recommended on base mainnet needs CLI 0.4.2+ .. on older CLIs pass 0xA000027A9B2802E1ddf7000061001e5c005A0000 (pass cliVersion to check)', '721c-base-mainnet');
         else if (cmpVer(cliVersion, '0.4.2') < 0) add('error', `--721c recommended does not resolve on base mainnet in CLI ${cliVersion} .. pass 0xA000027A9B2802E1ddf7000061001e5c005A0000 or upgrade to 0.4.2+`, '721c-base-mainnet');
       }
       const deps = [...l.matchAll(/--dep[ =]+(\S+)/g)].flatMap((m) => m[1].split(','));
-      if (ch === 'base' && deps.some((x) => /@/.test(x))) add('warn', `name@version deps on base (${deps.filter((x) => /@/.test(x)).join(', ')}) .. ABX's live view will load them from a CDN`, 'base-no-dependency-registry');
+      if (ch && CHAINS[ch] && !hasDependencyRegistry(ch) && deps.some((x) => /@/.test(x))) add('warn', `name@version deps on ${ch} (${deps.filter((x) => /@/.test(x)).join(', ')}) .. no art blocks registry on this chain, so ABX's live view will load them from a CDN`, 'base-no-dependency-registry');
+      if (hasDependencyRegistry(ch) && deps.some((x) => /@/.test(x))) add('info', `name@version deps on ${ch} resolve through art blocks' on-chain registry .. pick a version stored fully on-chain (list_libraries)`);
       if (v === undefined) add('info', 'no --721c .. royalties will be optional on every marketplace (fine if intended)');
       const bps = flag(l, 'royalty-bps');
       if (bps === undefined) add('info', 'no --royalty-bps .. the default is 5%');

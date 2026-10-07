@@ -1,15 +1,28 @@
 // read-only chain access for ABX SeriesCode contracts .. plain eth_call, no keys, no ABX servers.
 
 export const CHAINS = {
+  // production (abx beta networks)
   base: { id: 8453, rpcs: ['https://base-rpc.publicnode.com', 'https://base.drpc.org', 'https://mainnet.base.org'], explorer: 'https://basescan.org' },
+  ethereum: { id: 1, rpcs: ['https://ethereum-rpc.publicnode.com', 'https://eth.drpc.org'], explorer: 'https://etherscan.io' },
+  arbitrum: { id: 42161, rpcs: ['https://arb1.arbitrum.io/rpc', 'https://arbitrum-one-rpc.publicnode.com'], explorer: 'https://arbiscan.io' },
+  robinhood: { id: 4663, rpcs: ['https://rpc.mainnet.chain.robinhood.com', 'https://robinhood-rpc.publicnode.com'], explorer: 'https://robinhoodchain.blockscout.com' },
+  // testnets
   'base-sepolia': { id: 84532, rpcs: ['https://base-sepolia-rpc.publicnode.com', 'https://sepolia.base.org'], explorer: 'https://sepolia.basescan.org' },
-  // only used to read Art Blocks' on-chain library registry (p5, three, ...)
-  ethereum: { id: 1, rpcs: ['https://eth.drpc.org', 'https://ethereum-rpc.publicnode.com'], explorer: 'https://etherscan.io' },
+  sepolia: { id: 11155111, rpcs: ['https://ethereum-sepolia-rpc.publicnode.com'], explorer: 'https://sepolia.etherscan.io' },
+  'arbitrum-sepolia': { id: 421614, rpcs: ['https://sepolia-rollup.arbitrum.io/rpc', 'https://arbitrum-sepolia-rpc.publicnode.com'], explorer: 'https://sepolia.arbiscan.io' },
+  'robinhood-testnet': { id: 46630, rpcs: ['https://rpc.testnet.chain.robinhood.com', 'https://robinhood-sepolia-rpc.publicnode.com'], explorer: 'https://explorer.testnet.chain.robinhood.com' },
 };
+export const CHAIN_KEYS = Object.keys(CHAINS);
 
-// Art Blocks DependencyRegistryV0 .. ABX reads it for name@version libraries, but only lists it for
-// Ethereum (1) and Sepolia (11155111). Base has none (CLI 0.2.0 - 0.4.2).
-export const AB_DEPENDENCY_REGISTRY = { 1: '0x37861f95882ACDba2cCD84F5bFc4598e2ECDDdAF' };
+// Art Blocks DependencyRegistryV0 .. ABX resolves name@version libraries through it on Ethereum (1) and
+// Sepolia (11155111) only. Base, Arbitrum and Robinhood have none (checked on CLI 0.6.0).
+export const AB_DEPENDENCY_REGISTRY = { 1: '0x37861f95882ACDba2cCD84F5bFc4598e2ECDDdAF', 11155111: '0x5Fcc415BCFb164C5F826B5305274749BeB684e9b' };
+export const hasDependencyRegistry = (chain) => !!AB_DEPENDENCY_REGISTRY[CHAINS[chain]?.id];
+
+// ABX's recommended 721C validator (OpenSea's StrictAuthorizedTransferSecurityRegistry) .. known for these chains only
+// (CLI 0.6.0). On arbitrum / robinhood `--721c recommended` has no answer, so pass an address or leave 721C off.
+export const RECOMMENDED_721C = { 1: '0xA000027A9B2802E1ddf7000061001e5c005A0000', 11155111: '0xA000027A9B2802E1ddf7000061001e5c005A0000',
+  8453: '0xA000027A9B2802E1ddf7000061001e5c005A0000', 84532: '0xA000027A9B2802E1ddf7000061001e5c005A0000' };
 
 // selectors from the ABX SDK seriesCodeAbi (CLI 0.2.0)
 export const SEL = {

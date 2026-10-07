@@ -2,3 +2,5 @@ node_modules/
 nhm_*.html
 *.png
 .env
+share_notes.txt
+mcp/report.md
